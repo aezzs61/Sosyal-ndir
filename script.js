@@ -1,19 +1,12 @@
-document.getElementById('downloadBtn').addEventListener('click', function() {
-    let videoLink = document.getElementById('videoLink').value.trim();
+document.getElementById('downloadBtn').addEventListener('click', async function() {
+    const videoLink = document.getElementById('videoLink').value.trim();
     const resultArea = document.getElementById('resultArea');
     const saveBtn = document.getElementById('saveBtn');
+    const downloadBtn = this;
 
     if (!videoLink) {
         alert("Lütfen bir YouTube linki yapıştırın!");
         return;
-    }
-
-    // Link temizleme kontrolü
-    if (videoLink.includes('url=')) {
-        const urlParams = new URLSearchParams(videoLink.split('?')[1]);
-        if (urlParams.has('url')) {
-            videoLink = urlParams.get('url');
-        }
     }
 
     if (!videoLink.includes('youtube.com') && !videoLink.includes('youtu.be')) {
@@ -21,25 +14,53 @@ document.getElementById('downloadBtn').addEventListener('click', function() {
         return;
     }
 
-    this.innerText = "Bağlantı Hazırlanıyor...";
-    this.disabled = true;
+    downloadBtn.innerText = "Video İşleniyor...";
+    downloadBtn.disabled = true;
+    downloadBtn.style.opacity = "0.7";
+    resultArea.style.display = "none";
 
-    // Temiz YouTube indirme kodu
     const videoId = extractVideoId(videoLink);
-    const cleanDownloadUrl = `https://www.youtubepp.com/watch?v=${videoId}`;
-
-    // Yeni sekme açmıyoruz! Sayfadaki "Cihaza Kaydet" butonunun hedefini değiştiriyoruz.
-    saveBtn.href = cleanDownloadUrl;
     
-    // Alt taraftaki Bordo-Mavi indirme kutusunu görünür yapıyoruz
-    resultArea.style.display = "block";
+    // Tarayıcıyı tetiklemeyen alternatif bir ücretsiz herkese açık GET API'si
+    const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://api.cobalt.tools/api/json')}`;
 
-    // Üstteki butonu eski haline getiriyoruz
-    this.innerText = "Videoyu Yakala";
-    this.disabled = false;
+    try {
+        // Doğrudan Cobalt yerine proxy tüneli üzerinden GET yapıyoruz, localhost CORS hatası vermez
+        const response = await fetch(`https://api.codetabs.com/v1/proxy?url=${encodeURIComponent('https://api.cobalt.tools/api/json')}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                videoQuality: '720'
+            })
+        });
+
+        const result = await response.json();
+
+        if (result && result.url) {
+            saveBtn.href = result.url;
+            resultArea.style.display = "block"; 
+        } else {
+            // Yedek Köprü
+            saveBtn.href = `https://www.youtubepp.com/watch?v=${videoId}`;
+            resultArea.style.display = "block";
+        }
+
+    } catch (error) {
+        console.log("CORS nedeniyle otomatik köprü kuruldu.");
+        // Localhostta her ihtimale karşı butonu aç ve çalıştır
+        saveBtn.href = `https://www.youtubepp.com/watch?v=${videoId}`;
+        resultArea.style.display = "block";
+    } finally {
+        downloadBtn.innerText = "Videoyu Yakala";
+        downloadBtn.disabled = false;
+        downloadBtn.style.opacity = "1";
+    }
 });
 
-// Video ID'sini çeken fonksiyon
 function extractVideoId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
